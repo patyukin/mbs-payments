@@ -1,0 +1,25 @@
+@startuml
+actor User
+database auth
+database reports
+database accounts
+database credits
+database notifies
+
+
+[User] --> [API Gateway]
+[API Gateway] --> [Auth service]
+[Auth service] --> auth
+[Auth service] --> [Notifier service]
+[API Gateway] --> [Credit service]
+[Credit service] --> credits
+[Credit service] --> [Notifier service]
+[API Gateway] --> [Account service]
+[Account service] --> accounts
+[Account service] --> [Notifier service]
+[API Gateway] --> [Report service]
+[Report service] --> reports
+[Report service] --> [Notifier service]
+
+[Notifier service] --> notifies
+@enduml
