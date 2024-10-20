@@ -1,0 +1,6 @@
+/.idea/
+go_build_*
+config.yaml
+config-local.yaml
+/api_gateway
+/bin/*
