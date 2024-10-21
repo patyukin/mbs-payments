@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      dockerfile: local.Dockerfile
+    container_name: mbs-api-gateway-container
+    volumes:
+      - .:/app
+    restart: always
+    ports:
+      - "5001:5001"
+    networks:
+      - pg
+      - redis
+      - mbs
+
+networks:
+  pg:
+    name: pg
+    external: true
+  redis:
+    name: redis
+    external: true
+  mbs:
+    name: mbs
+    external: true
