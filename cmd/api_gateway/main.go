@@ -2,17 +2,21 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/patyukin/bs-payments/internal/config"
-	"github.com/patyukin/bs-payments/internal/handler"
-	"github.com/patyukin/bs-payments/internal/server"
-	"github.com/patyukin/bs-payments/pkg/tracer"
+	"github.com/patyukin/bs-payments/internal/db"
+	"github.com/patyukin/bs-payments/internal/migrator"
+	"github.com/patyukin/bs-payments/internal/usecase"
+	"github.com/patyukin/bs-payments/pkg/dbconn"
+	"github.com/patyukin/bs-payments/pkg/otely"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"google.golang.org/grpc"
+	"net"
+	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
+	"sync"
 	"time"
 )
 
@@ -25,72 +29,59 @@ func main() {
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatal().Msgf("unable to load config: %v", err)
+		log.Fatal().Msgf("failed to load config, error: %v", err)
 	}
 
-	srvAddress := fmt.Sprintf(":%d", cfg.HttpServer.Port)
-
-	// register metrics
-	err = metrics.RegisterMetrics()
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPCServer.Port))
 	if err != nil {
-		log.Fatal().Msgf("failed to register metrics: %v", err)
+		log.Fatal().Msgf("failed to listen: %v", err)
 	}
 
-	traceProvider, err := tracer.Init(fmt.Sprintf("%s/api/traces", cfg.TracerHost), "Api Gateway")
+	dbConn, err := dbconn.New(ctx, dbconn.PostgreSQLConfig(cfg.PostgreSQL))
 	if err != nil {
-		log.Fatal().Msgf("failed init tracer, err: %v", err)
+		log.Fatal().Msgf("failed to connect to db: %v", err)
 	}
 
-	// auth service init
-	authConn, err := grpc_client.NewGRPCClientServiceConn(cfg.GRPC.AuthServicePort)
+	if err = migrator.UpMigrations(ctx, dbConn); err != nil {
+		log.Fatal().Msgf("failed to up migrations: %v", err)
+	}
+
+	registry := db.New(dbConn)
+	uc := usecase.New(registry)
+	desc.RegisterAuthServiceServer(s, srv)
+
+	// Создаем экземпляр MetricsWrapper
+	otelyShutdown, err := otely.SetupOTelSDK(ctx)
 	if err != nil {
-		log.Fatal().Msgf("failed to connect to auth service: %v", err)
+		log.Fatal().Msgf("failed to initialize metrics wrapper: %v", err)
 	}
 
-	defer func(authConn *grpc.ClientConn) {
-		if err = authConn.Close(); err != nil {
-			log.Error().Msgf("failed to close auth service connection: %v", err)
-		}
-	}(authConn)
+	wg := &sync.WaitGroup{}
 
-	authClient := authpb.NewAuthServiceClient(authConn)
-	authUseCase := auth.New([]byte(cfg.JwtSecret), authClient)
-
-	h := handler.New(authUseCase)
-	r := server.InitRouterWithTrace(h, cfg, srvAddress)
-	srv := server.New(r)
-
-	errCh := make(chan error)
-
+	// GRPC server
+	wg.Add(1)
 	go func() {
-		log.Info().Msgf("starting server on %d", cfg.HttpServer.Port)
-		if err = srv.Run(srvAddress, cfg); err != nil {
-			log.Error().Msgf("failed starting server: %v", err)
-			errCh <- err
+		defer wg.Done()
+
+		log.Info().Msgf("GRPC started on :%d", cfg.GRPCServer.Port)
+		if err = s.Serve(lis); err != nil {
+			log.Fatal().Msgf("failed to serve: %v", err)
 		}
 	}()
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	// metrics server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-	select {
-	case err = <-errCh:
-		log.Error().Msgf("Failed to run, err: %v", err)
-	case res := <-sigChan:
-		if res == syscall.SIGINT || res == syscall.SIGTERM {
-			log.Info().Msgf("Signal received")
-		} else if res == syscall.SIGHUP {
-			log.Info().Msgf("Signal received")
+		http.Handle("/metrics", promhttp.Handler())
+		log.Info().Msgf("Prometheus metrics exposed on :%d/metrics", cfg.HttpServer.Port)
+		if err = http.ListenAndServe(fmt.Sprintf(":%d", cfg.HttpServer.Port), nil); err != nil {
+			log.Fatal().Msgf("Failed to serve Prometheus metrics: %v", err)
 		}
-	}
+	}()
 
-	log.Info().Msgf("Shutting Down")
+	wg.Wait()
 
-	if err = srv.Shutdown(ctx); err != nil {
-		log.Error().Msgf("failed server shutting down: %s", err.Error())
-	}
-
-	if err = traceProvider.Shutdown(ctx); err != nil {
-		log.Error().Msgf("Error shutting down tracer provider: %v", err)
-	}
+	err = errors.Join(err, otelyShutdown(ctx))
 }

@@ -1,8 +1,8 @@
 package server
 
 import (
-	"auth-telegram/internal/config"
 	"context"
+	"github.com/patyukin/bs-payments/internal/config"
 	"github.com/rs/zerolog/log"
 	"net/http"
 	"time"
@@ -25,8 +25,8 @@ func (s *Server) Run(addr string, cfg *config.Config) error {
 		Addr:           addr,
 		Handler:        s.h,
 		MaxHeaderBytes: 1 << 20, // 1 MB
-		ReadTimeout:    time.Duration(cfg.ReadTimeout) * time.Second,
-		WriteTimeout:   time.Duration(cfg.WriteTimeout) * time.Second,
+		ReadTimeout:    time.Duration(cfg.HttpServer.ReadTimeout) * time.Second,
+		WriteTimeout:   time.Duration(cfg.HttpServer.WriteTimeout) * time.Second,
 	}
 
 	log.Info().Msgf("Starting server on %s", addr)

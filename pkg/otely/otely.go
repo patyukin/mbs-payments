@@ -1,17 +1,14 @@
-package otel
+package otely
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	"go.opentelemetry.io/otel/log/global"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
@@ -19,18 +16,18 @@ import (
 // SetupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
 func SetupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
-	var shutdownFuncs []func(context.Context) error
+	var shutdownFunctions []func(context.Context) error
 
 	// shutdown calls cleanup functions registered via shutdownFuncs.
 	// The errors from the calls are joined.
 	// Each registered cleanup will be invoked once.
 	shutdown = func(ctx context.Context) error {
 		var shutdownErr error
-		for _, fn := range shutdownFuncs {
+		for _, fn := range shutdownFunctions {
 			shutdownErr = errors.Join(shutdownErr, fn(ctx))
 		}
 
-		shutdownFuncs = nil
+		shutdownFunctions = nil
 
 		return shutdownErr
 	}
@@ -40,10 +37,6 @@ func SetupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		err = errors.Join(inErr, shutdown(ctx))
 	}
 
-	// Set up propagator.
-	prop := newPropagator()
-	otel.SetTextMapPropagator(prop)
-
 	// Set up trace provider.
 	tracerProvider, err := newTraceProvider()
 	if err != nil {
@@ -51,7 +44,7 @@ func SetupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		return
 	}
 
-	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
+	shutdownFunctions = append(shutdownFunctions, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
@@ -61,65 +54,45 @@ func SetupOTelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		return
 	}
 
-	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
+	shutdownFunctions = append(shutdownFunctions, meterProvider.Shutdown)
 	otel.SetMeterProvider(meterProvider)
-
-	// Set up logger provider.
-	loggerProvider, err := newLoggerProvider()
-	if err != nil {
-		handleErr(err)
-		return
-	}
-	shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
-	global.SetLoggerProvider(loggerProvider)
 
 	return
 }
 
-func newPropagator() propagation.TextMapPropagator {
-	return propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	)
-}
-
 func newTraceProvider() (*trace.TracerProvider, error) {
 	traceExporter, err := stdouttrace.New(
-		stdouttrace.WithPrettyPrint())
+		stdouttrace.WithPrettyPrint(),
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create trace exporter: %w", err)
 	}
 
 	traceProvider := trace.NewTracerProvider(
-		trace.WithBatcher(traceExporter,
+		trace.WithBatcher(
+			traceExporter,
 			// Default is 5s. Set to 1s for demonstrative purposes.
-			trace.WithBatchTimeout(time.Second)),
+			trace.WithBatchTimeout(time.Second),
+		),
 	)
+
 	return traceProvider, nil
 }
 
 func newMeterProvider() (*metric.MeterProvider, error) {
 	metricExporter, err := stdoutmetric.New()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create metric exporter: %w", err)
 	}
 
 	meterProvider := metric.NewMeterProvider(
-		metric.WithReader(metric.NewPeriodicReader(metricExporter,
-			// Default is 1m. Set to 3s for demonstrative purposes.
-			metric.WithInterval(3*time.Second))),
+		metric.WithReader(
+			metric.NewPeriodicReader(
+				metricExporter,
+				// Default is 1m. Set to 3s for demonstrative purposes.
+				metric.WithInterval(3*time.Second),
+			),
+		),
 	)
 	return meterProvider, nil
-}
-
-func newLoggerProvider() (*log.LoggerProvider, error) {
-	logExporter, err := stdoutlog.New()
-	if err != nil {
-		return nil, err
-	}
-
-	loggerProvider := log.NewLoggerProvider(
-		log.WithProcessor(log.NewBatchProcessor(logExporter)),
-	)
-	return loggerProvider, nil
 }
