@@ -1,4 +1,4 @@
-FROM golang:1.23.1-alpine3.20 AS builder
+FROM golang:1.23.2-alpine3.20 AS builder
 
 ENV config=docker
 
@@ -13,4 +13,4 @@ RUN go mod tidy && \
     go get github.com/githubnemo/CompileDaemon && \
     go install github.com/githubnemo/CompileDaemon
 
-ENTRYPOINT CompileDaemon --build="go build -o ./api_gateway cmd/api_gateway/main.go" --command=./api_gateway
+ENTRYPOINT CompileDaemon --build="go build -o ./go_build_payment cmd/payment/main.go" --command=./go_build_payment

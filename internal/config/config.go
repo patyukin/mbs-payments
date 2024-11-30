@@ -16,13 +16,18 @@ type Config struct {
 	GRPCServer struct {
 		Port int `yaml:"port" validate:"required,numeric"`
 	} `yaml:"grpc_server" validate:"required"`
-	PostgreSQL struct {
-		Host     string `yaml:"host" validate:"required"`
-		Port     int    `yaml:"port" validate:"required,numeric"`
-		User     string `yaml:"user" validate:"required"`
-		Password string `yaml:"password" validate:"required"`
-		Name     string `yaml:"name" validate:"required"`
-	} `yaml:"postgresql"`
+	PostgreSQLDSN string `yaml:"postgresql_dsn" validate:"required"`
+	RedisDSN      string `yaml:"redis_dsn" validate:"required"`
+	RabbitMQURL   string `yaml:"rabbitmq_url" validate:"required"`
+	TracerHost    string `yaml:"tracer_host" validate:"required"`
+	Kafka         struct {
+		Brokers       []string `yaml:"brokers" validate:"required"`
+		ConsumerGroup string   `yaml:"consumer_group" validate:"required"`
+		Topics        []string `yaml:"topics" validate:"required"`
+	} `yaml:"kafka"`
+	GRPC struct {
+		AuthService string `yaml:"auth_service" validate:"required"`
+	} `yaml:"grpc" validate:"required"`
 }
 
 func LoadConfig() (*Config, error) {

@@ -24,7 +24,6 @@ rebuild:
 gen:
 	make install-deps
 	make gen-api
-	go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/api_gateway/main.go -o docs/
 
 install-deps:
 	GOBIN=$(LOCAL_BIN) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
@@ -39,12 +38,21 @@ test:
 	go test ./...
 
 gen-api:
-	mkdir -p pkg/auth_v1
+	mkdir -p pkg/proto/auth_v1
 	protoc --proto_path api/auth_v1 \
-	--go_out=pkg/auth_v1 --go_opt=paths=source_relative \
+	--go_out=pkg/proto/auth_v1 --go_opt=paths=source_relative \
 	--plugin=protoc-gen-go=bin/protoc-gen-go \
-	--go-grpc_out=pkg/auth_v1 --go-grpc_opt=paths=source_relative \
+	--go-grpc_out=pkg/proto/auth_v1 --go-grpc_opt=paths=source_relative \
 	--plugin=protoc-gen-go-grpc=bin/protoc-gen-go-grpc \
-	--validate_out lang=go:pkg/auth_v1 --validate_opt=paths=source_relative \
+	--validate_out lang=go:pkg/proto/auth_v1 --validate_opt=paths=source_relative \
 	--plugin=protoc-gen-validate=bin/protoc-gen-validate \
 	api/auth_v1/auth.proto
+	mkdir -p pkg/proto/payment_v1
+	protoc --proto_path api/payment_v1 \
+	--go_out=pkg/proto/payment_v1 --go_opt=paths=source_relative \
+	--plugin=protoc-gen-go=bin/protoc-gen-go \
+	--go-grpc_out=pkg/proto/payment_v1 --go-grpc_opt=paths=source_relative \
+	--plugin=protoc-gen-go-grpc=bin/protoc-gen-go-grpc \
+	--validate_out lang=go:pkg/proto/payment_v1 --validate_opt=paths=source_relative \
+	--plugin=protoc-gen-validate=bin/protoc-gen-validate \
+	api/payment_v1/payment.proto

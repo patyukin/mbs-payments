@@ -8,20 +8,17 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type RepositoryInterface interface {
-}
-
 type Registry struct {
 	db *sql.DB
 }
 
-func (registry *Registry) GetRepo() RepositoryInterface {
+func (registry *Registry) GetRepo() *Repository {
 	return &Repository{
 		db: registry.db,
 	}
 }
 
-type Handler func(ctx context.Context, repo RepositoryInterface) error
+type Handler func(ctx context.Context, repo *Repository) error
 
 func New(db *sql.DB) *Registry {
 	return &Registry{db: db}
