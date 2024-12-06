@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	paymentpb "github.com/patyukin/mbs-pkg/pkg/proto/payment_v1"
+	"time"
 )
 
 func (r *Repository) InsertAccount(ctx context.Context, in *paymentpb.CreateAccountRequest) (string, error) {
-	query := `INSERT INTO accounts (user_id, currency, balance) VALUES ($1, $2, $3) RETURNING id`
-	row := r.db.QueryRowContext(ctx, query, in.UserId, in.Currency, in.Balance)
+	query := `INSERT INTO accounts (user_id, currency, balance, created_at) VALUES ($1, $2, $3, $4) RETURNING id`
+	row := r.db.QueryRowContext(ctx, query, in.UserId, in.Currency, in.Balance, time.Now().UTC())
 	if row.Err() != nil {
 		return "", fmt.Errorf("failed r.db.QueryRowContext, row.Err(): %w", row.Err())
 	}
@@ -82,4 +83,20 @@ func (r *Repository) DecreaseAccountBalance(ctx context.Context, accountID strin
 	}
 
 	return nil
+}
+
+func (r *Repository) SelectUserIDByAccountID(ctx context.Context, accountID string) (string, error) {
+	query := `SELECT user_id FROM accounts WHERE id = $1`
+	row := r.db.QueryRowContext(ctx, query, accountID)
+	if row.Err() != nil {
+		return "", fmt.Errorf("failed r.db.QueryRowContext: %w", row.Err())
+	}
+
+	var userID string
+	err := row.Scan(&userID)
+	if err != nil {
+		return "", fmt.Errorf("failed row.Scan: %w", err)
+	}
+
+	return userID, nil
 }

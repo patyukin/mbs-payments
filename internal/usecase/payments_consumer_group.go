@@ -9,18 +9,13 @@ import (
 )
 
 func (u *UseCase) PaymentsConsumerGroup(ctx context.Context, record *kgo.Record) error {
-	select {
-	case <-ctx.Done():
-		log.Error().Msgf("Context is done before processing in PaymentsConsumerGroup: %v", ctx.Err())
-		return ctx.Err()
-	default:
-	}
+	log.Debug().Msgf("Received to topic: %s, record: %v", record.Topic, string(record.Value))
 
 	switch record.Topic {
-	case kafka.TransactionsTopic:
-		err := u.UpdateTransactionsStatus(ctx, record)
+	case kafka.TransactionReportSolutionTopic:
+		err := u.ConsumeTransactionReportSolution(ctx, record)
 		if err != nil {
-			return fmt.Errorf("failed u.UpdateTransactionsStatus: %w", err)
+			return fmt.Errorf("failed u.ConsumeTransactionReportSolution: %w", err)
 		}
 	case kafka.PaymentRequestTopic:
 		err := u.ConsumerPaymentRequest(ctx, record)
@@ -28,12 +23,12 @@ func (u *UseCase) PaymentsConsumerGroup(ctx context.Context, record *kgo.Record)
 			return fmt.Errorf("failed u.ConsumerPaymentRequest: %w", err)
 		}
 	case kafka.CreditCreatedTopic:
-		err := u.ConsumerCreditCreated(ctx, record)
+		err := u.ConsumeCreditCreated(ctx, record)
 		if err != nil {
 			return fmt.Errorf("failed u.ConsumerPaymentRequest: %w", err)
 		}
 	case kafka.CreditPaymentsTopic:
-		err := u.ConsumerCreditPayments(ctx, record)
+		err := u.ConsumeCreditPayments(ctx, record)
 		if err != nil {
 			return fmt.Errorf("failed u.ConsumerPaymentRequest: %w", err)
 		}

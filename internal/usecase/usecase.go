@@ -11,7 +11,7 @@ import (
 type Cacher interface {
 	SetPaymentConfirmationCode(ctx context.Context, userID, paymentID, code string) error
 	GetPaymentConfirmationCode(ctx context.Context, userID, code string) (string, error)
-	DeletePaymentConfirmationCode(ctx context.Context, userID, code string) error
+	DeletePaymentConfirmationCode(ctx context.Context, userID, paymentID string) error
 }
 
 type RabbitMQProducer interface {

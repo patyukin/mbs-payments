@@ -34,17 +34,7 @@ func (u *UseCase) ConsumerPaymentRequest(ctx context.Context, record *kgo.Record
 			return fmt.Errorf("failed repo.GetPayment: %w", err)
 		}
 
-		err = repo.UpdateAccountBalance(ctx, payment.SenderAccountID, payment.Amount*(-1))
-		if err != nil {
-			log.Error().Msgf("failed repo.UpdateAccountBalance: %v", err)
-			if err = repo.UpdatePaymentStatusByID(ctx, message.PaymentID, "FAILED"); err != nil {
-				log.Error().Msgf("failed repo.UpdatePaymentStatus to status FAILED: %v", err)
-			}
-
-			return fmt.Errorf("failed repo.UpdateAccountBalance: %w", err)
-		}
-
-		err = repo.UpdateAccountBalance(ctx, payment.ReceiverAccountID, payment.Amount)
+		err = repo.DecreaseAccountBalance(ctx, payment.SenderAccountID, payment.Amount)
 		if err != nil {
 			log.Error().Msgf("failed repo.UpdateAccountBalance: %v", err)
 			if err = repo.UpdatePaymentStatusByID(ctx, message.PaymentID, "FAILED"); err != nil {
@@ -62,6 +52,16 @@ func (u *UseCase) ConsumerPaymentRequest(ctx context.Context, record *kgo.Record
 			}
 
 			return fmt.Errorf("failed repo.InsertTransaction: %w", err)
+		}
+
+		err = repo.IncreaseAccountBalance(ctx, payment.ReceiverAccountID, payment.Amount)
+		if err != nil {
+			log.Error().Msgf("failed repo.UpdateAccountBalance: %v", err)
+			if err = repo.UpdatePaymentStatusByID(ctx, message.PaymentID, "FAILED"); err != nil {
+				log.Error().Msgf("failed repo.UpdatePaymentStatus to status FAILED: %v", err)
+			}
+
+			return fmt.Errorf("failed repo.UpdateAccountBalance: %w", err)
 		}
 
 		_, err = repo.InsertTransaction(ctx, payment, payment.ReceiverAccountID, "CREDIT")

@@ -9,24 +9,23 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-func (u *UseCase) ConsumerCreditCreated(ctx context.Context, record *kgo.Record) error {
+func (u *UseCase) ConsumeTransactionReportSolution(ctx context.Context, record *kgo.Record) error {
 	err := u.registry.ReadCommitted(ctx, func(ctx context.Context, repo *db.Repository) error {
-		var credit model.CreditCreated
-		if err := json.Unmarshal(record.Value, &credit); err != nil {
+		var transactions []model.TransactionSendStatus
+		if err := json.Unmarshal(record.Value, &transactions); err != nil {
 			return fmt.Errorf("failed to unmarshal message for topic '%s': %w", record.Topic, err)
 		}
 
-		err := repo.DecreaseAccountBalance(ctx, credit.AccountID, credit.Amount)
+		err := repo.UpdateTransactionsSendStatus(ctx, transactions)
 		if err != nil {
-			return fmt.Errorf("failed repo.DecreaseAccountBalance: %w", err)
+			return fmt.Errorf("failed repo.ConsumeTransactionReportSolution: %w", err)
 		}
-
-		u.rbtmq.PushCreditCreated(ctx, record.Value, record.Headers)
-		// send notify "кредит успешно создан"
 
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed processing in PaymentConsumeHandler: %w", err)
 	}
+
+	return nil
 }

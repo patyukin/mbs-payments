@@ -34,7 +34,7 @@ func (c *Cacher) Close() error {
 }
 
 func (c *Cacher) SetPaymentConfirmationCode(ctx context.Context, userID, paymentID, code string) error {
-	return c.client.Set(ctx, fmt.Sprintf("u:%s:pc:%s", userID, paymentID), code, 5*time.Minute).Err()
+	return c.client.Set(ctx, fmt.Sprintf("u:%s:pc:%s", userID, paymentID), code, 50*time.Minute).Err()
 }
 
 func (c *Cacher) GetPaymentConfirmationCode(ctx context.Context, userID, code string) (string, error) {
@@ -50,6 +50,7 @@ func (c *Cacher) GetPaymentConfirmationCode(ctx context.Context, userID, code st
 		if errors.Is(err, redis.Nil) {
 			continue
 		}
+
 		if err != nil {
 			return "", fmt.Errorf("failed to get value for key %s: %w", key, err)
 		}
@@ -62,27 +63,11 @@ func (c *Cacher) GetPaymentConfirmationCode(ctx context.Context, userID, code st
 	return "", fmt.Errorf("payment confirmation code not found for userID: %s and code: %s", userID, code)
 }
 
-func (c *Cacher) DeletePaymentConfirmationCode(ctx context.Context, userID, code string) error {
-	pattern := fmt.Sprintf("u:%s:pc:*", userID)
-	keys, err := c.client.Keys(ctx, pattern).Result()
+func (c *Cacher) DeletePaymentConfirmationCode(ctx context.Context, userID, paymentID string) error {
+	err := c.client.Del(ctx, fmt.Sprintf("u:%s:pc:%s", userID, paymentID)).Err()
 	if err != nil {
-		return fmt.Errorf("failed to get keys: %w", err)
+		return fmt.Errorf("failed to delete payment confirmation code: %w", err)
 	}
 
-	var storedCode string
-	for _, key := range keys {
-		storedCode, err = c.client.Get(ctx, key).Result()
-		if errors.Is(err, redis.Nil) {
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("failed to get value for key %s: %w", key, err)
-		}
-
-		if storedCode == code {
-			return c.client.Del(ctx, key).Err()
-		}
-	}
-
-	return fmt.Errorf("payment confirmation code not found for userID: %s and code: %s", userID, code)
+	return nil
 }

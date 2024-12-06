@@ -18,3 +18,15 @@ type Payment struct {
 	CreatedAt         time.Time
 	UpdatedAt         sql.NullTime
 }
+
+type Transaction struct {
+	ID          string
+	PaymentID   string
+	AccountID   string
+	Type        string
+	Amount      int64
+	Currency    string
+	Description string
+	Status      string
+	CreatedAt   string
+}

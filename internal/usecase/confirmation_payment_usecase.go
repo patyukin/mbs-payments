@@ -16,6 +16,15 @@ func (u *UseCase) ConfirmationPaymentUseCase(ctx context.Context, in *paymentpb.
 			return fmt.Errorf("failed u.chr.GetPaymentConfirmationCode: %w", err)
 		}
 
+		if paymentID == "" {
+			return fmt.Errorf("payment confirmation code not found for userID: %s and code: %s", in.UserId, in.Code)
+		}
+
+		err = u.chr.DeletePaymentConfirmationCode(ctx, in.UserId, paymentID)
+		if err != nil {
+			return fmt.Errorf("failed u.chr.DeletePaymentConfirmationCode: %w", err)
+		}
+
 		payment, err := repo.GetPaymentByID(ctx, paymentID)
 		if err != nil {
 			return fmt.Errorf("failed repo.GetPayment: %w", err)
@@ -41,7 +50,7 @@ func (u *UseCase) ConfirmationPaymentUseCase(ctx context.Context, in *paymentpb.
 			return fmt.Errorf("failed to marshal message: %w", err)
 		}
 
-		err = u.kfk.PublishPaymentReport(ctx, paymentRequestBytes)
+		err = u.kfk.PublishPaymentRequest(ctx, paymentRequestBytes)
 		if err != nil {
 			return fmt.Errorf("failed u.rbtmq.PushPaymentStatusChange: %w", err)
 		}

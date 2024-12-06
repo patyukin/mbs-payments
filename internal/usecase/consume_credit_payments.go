@@ -10,20 +10,18 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-func (u *UseCase) ConsumerCreditPayments(ctx context.Context, record *kgo.Record) error {
-	err := u.registry.ReadCommitted(ctx, func(ctx context.Context, repo *db.Repository) error {
+func (u *UseCase) ConsumeCreditPayments(ctx context.Context, record *kgo.Record) error {
+	var creditPaymentsSolution []model.CreditPaymentSolution
 
+	err := u.registry.ReadCommitted(ctx, func(ctx context.Context, repo *db.Repository) error {
 		var payments []model.CreditPayment
 		if err := json.Unmarshal(record.Value, &payments); err != nil {
 			return fmt.Errorf("failed to unmarshal messages: %w", err)
 		}
 
-		creditPaymentsSolution := make([]model.CreditPaymentSolution, 0, len(payments))
-
 		for _, payment := range payments {
 			status := "COMPLETED"
-			err := repo.DecreaseAccountBalance(ctx, payment.AccountID, payment.Amount)
-			if err != nil {
+			if err := repo.DecreaseAccountBalance(ctx, payment.AccountID, payment.Amount); err != nil {
 				log.Error().Msgf("failed repo.UpdateAccountBalance: %v", err)
 				status = "FAILED"
 			}
@@ -37,6 +35,15 @@ func (u *UseCase) ConsumerCreditPayments(ctx context.Context, record *kgo.Record
 	})
 	if err != nil {
 		return fmt.Errorf("failed processing in PaymentConsumeHandler: %w", err)
+	}
+
+	bytes, err := json.Marshal(creditPaymentsSolution)
+	if err != nil {
+		return fmt.Errorf("failed to marshal messages: %w", err)
+	}
+
+	if err = u.kfk.PublishCreditPaymentsSolution(ctx, bytes); err != nil {
+		return fmt.Errorf("failed u.kafkaProducer.PublishCreditPaymentSolution: %w", err)
 	}
 
 	return nil

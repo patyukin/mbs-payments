@@ -6,6 +6,7 @@ import (
 	grpcPrometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/patyukin/bs-payments/internal/cacher"
 	"github.com/patyukin/bs-payments/internal/config"
+	"github.com/patyukin/bs-payments/internal/cronjob"
 	"github.com/patyukin/bs-payments/internal/db"
 	"github.com/patyukin/bs-payments/internal/metrics"
 	"github.com/patyukin/bs-payments/internal/server"
@@ -15,7 +16,7 @@ import (
 	"github.com/patyukin/mbs-pkg/pkg/grpc_server"
 	"github.com/patyukin/mbs-pkg/pkg/kafka"
 	"github.com/patyukin/mbs-pkg/pkg/migrator"
-	"github.com/patyukin/mbs-pkg/pkg/mux"
+	"github.com/patyukin/mbs-pkg/pkg/mux_server"
 	authpb "github.com/patyukin/mbs-pkg/pkg/proto/auth_v1"
 	desc "github.com/patyukin/mbs-pkg/pkg/proto/payment_v1"
 	"github.com/patyukin/mbs-pkg/pkg/rabbitmq"
@@ -130,13 +131,22 @@ func main() {
 	grpcPrometheus.Register(s)
 
 	// mux server
-	m := mux.New()
+	muxServer := mux_server.New()
 
 	errCh := make(chan error)
 
+	// cron job
+	cj := cronjob.New(uc)
+	go func() {
+		if err = cj.Run(ctx); err != nil {
+			log.Error().Msgf("failed adding cron job, err: %v", err)
+			errCh <- err
+		}
+	}()
+
 	// run payments consumer
 	go func() {
-		if err = kfk.ProcessMessages(ctx, uc.PaymentsConsumerGroup); err != nil {
+		if err = kfkConsumer.ProcessMessages(ctx, uc.PaymentsConsumerGroup); err != nil {
 			log.Error().Msgf("failed to process messages: %v", err)
 			errCh <- err
 		}
@@ -154,7 +164,7 @@ func main() {
 	// metrics + pprof server
 	go func() {
 		log.Info().Msgf("Prometheus metrics exposed on :%d/metrics", cfg.HttpServer.Port)
-		if err = m.Run(cfg.HttpServer.Port); err != nil {
+		if err = muxServer.Run(cfg.HttpServer.Port); err != nil {
 			log.Error().Msgf("Failed to serve Prometheus metrics: %v", err)
 			errCh <- err
 		}
@@ -179,7 +189,7 @@ func main() {
 	// stop server
 	s.GracefulStop()
 
-	if err = m.Shutdown(ctx); err != nil {
+	if err = muxServer.Shutdown(ctx); err != nil {
 		log.Error().Msgf("failed to shutdown http server: %s", err.Error())
 	}
 

@@ -34,7 +34,7 @@ func (u *UseCase) CreateAccountUseCase(ctx context.Context, in *paymentpb.Create
 			return fmt.Errorf("failed to marshal message: %w", err)
 		}
 
-		err = u.rbtmq.PublishAccountCreation(ctx, msgBytes, nil)
+		err = u.rbtmq.EnqueueTelegramMessage(ctx, msgBytes, nil)
 		if err != nil {
 			return fmt.Errorf("failed u.rbtmq.PublishAccountCreation: %w", err)
 		}
@@ -45,5 +45,5 @@ func (u *UseCase) CreateAccountUseCase(ctx context.Context, in *paymentpb.Create
 		return nil, fmt.Errorf("failed u.registry.ReadCommitted: %w", err)
 	}
 
-	return &paymentpb.CreateAccountResponse{}, nil
+	return &paymentpb.CreateAccountResponse{Message: "Счет успешно добавлен"}, nil
 }
