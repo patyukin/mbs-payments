@@ -12,6 +12,6 @@ FROM alpine:3.20
 WORKDIR /app
 COPY --from=builder /app/bin/payment .
 ENV YAML_CONFIG_FILE_PATH=config.yaml
-COPY config.yaml config.yaml
+COPY migrations migrations
 
 CMD ["./payment"]
