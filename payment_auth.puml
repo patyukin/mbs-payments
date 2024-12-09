@@ -1,0 +1,29 @@
+@startuml
+participant User
+participant APIGateway
+participant AuthService
+participant PaymentService
+participant DatabasePayments
+participant MessageBroker
+participant CreditsService
+participant NotificationService
+
+MessageBroker->>PaymentService: credit_approved (credit_id, user_id, amount)
+PaymentService->>DatabasePayments: CreateAccount(CreateAccountRequest)
+DatabasePayments-->>PaymentService: CreateAccountResponse (account_id, account_number)
+PaymentService->>MessageBroker: account_created (credit_id, account_id, account_number)
+
+User->>APIGateway: POST /makePayment
+APIGateway->>AuthService: ValidateUser(token)
+AuthService-->>APIGateway: UserActive / UserInactive
+alt UserActive
+    APIGateway->>PaymentService: CreatePayment(CreatePaymentRequest)
+    PaymentService->>DatabasePayments: Создаёт транзакцию (transaction_id, status=PENDING)
+    DatabasePayments-->>PaymentService: CreatePaymentResponse (transaction_id, status=COMPLETED)
+    PaymentService->>MessageBroker: payment_completed (transaction_id, credit_id, amount, status)
+    PaymentService->>NotificationService: Уведомляет о платеже
+else UserInactive
+    APIGateway->>User: Ответ 403 Forbidden
+end
+
+@enduml

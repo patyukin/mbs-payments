@@ -1,0 +1,14 @@
+min_log_level: "debug"
+grpc_server:
+  port: 5021
+http_server:
+  port: 5022
+postgresql:
+  host: "localhost"
+  port: 5422
+  user: "user"
+  password: "password"
+  name: "name"
+grpc_service_port:
+  auth: 5011
+  credits: 5031

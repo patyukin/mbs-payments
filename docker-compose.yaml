@@ -1,0 +1,18 @@
+services:
+  mbs-payment:
+    build:
+      dockerfile: local.Dockerfile
+    container_name: mbs-payment-container
+    volumes:
+      - .:/app
+    restart: always
+    ports:
+      - "5041:5041"
+      - "5042:5042"
+    networks:
+      - mbs
+
+networks:
+  mbs:
+    name: mbs
+    external: true

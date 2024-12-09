@@ -1,0 +1,25 @@
+@startuml
+
+participant User
+participant ClientApp
+participant CreditService
+participant PaymentService
+participant MessageBroker
+participant NotificationService
+
+User->>ClientApp: Подаёт заявку на кредит
+ClientApp->>CreditService: CreateCreditApplication(CreateCreditApplicationRequest)
+CreditService->>CreditService: Сохраняет заявку (status=PENDING)
+CreditService->>CreditService: Обрабатывает заявку
+CreditService->>MessageBroker: Отправляет событие credit_approved (UUID)
+MessageBroker->>PaymentService: Получает событие credit_approved (UUID)
+PaymentService->>PaymentService: CreateAccount(CreateAccountRequest)
+PaymentService->>PaymentService: Создаёт счёт в accounts (UUID)
+PaymentService->>CreditService: Отвечает CreateAccountResponse (UUID)
+CreditService->>PaymentService: CreatePayment(CreatePaymentRequest)
+PaymentService->>PaymentService: Обрабатывает платеж (disbursement) (UUID)
+PaymentService->>MessageBroker: Отправляет событие payment_completed (UUID)
+MessageBroker->>CreditService: Получает событие payment_completed (UUID)
+CreditService->>CreditService: Обновляет кредит (уменьшает остаток)
+CreditService->>NotificationService: Уведомляет пользователя о платеже
+@enduml
