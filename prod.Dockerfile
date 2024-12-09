@@ -5,13 +5,13 @@ WORKDIR /app
 
 RUN go mod download
 RUN go mod tidy
-RUN go build -o ./bin/api_gateway cmd/api_gateway/main.go
+RUN go build -o ./bin/payment cmd/payment/main.go
 
 FROM alpine:3.20
 
 WORKDIR /app
-COPY --from=builder /app/bin/api_gateway .
+COPY --from=builder /app/bin/payment .
 ENV YAML_CONFIG_FILE_PATH=config.yaml
-COPY config.yaml config.yaml
+COPY migrations migrations
 
-CMD ["./api_gateway"]
+CMD ["./payment"]
