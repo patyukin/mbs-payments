@@ -25,13 +25,15 @@ func New(uc UseCase) *CronJob {
 }
 
 func (cj *CronJob) Run(ctx context.Context) error {
-	_, err := cj.c.AddFunc("* * * * *", func() {
-		log.Info().Msg("run cj.uc.CronSendTransactions")
+	_, err := cj.c.AddFunc(
+		"* * * * *", func() {
+			log.Info().Msg("run cj.uc.CronSendTransactions")
 
-		if localErr := cj.uc.CronSendTransactions(ctx); localErr != nil {
-			log.Error().Msgf("failed cj.uc.CronSendTransactions, err: %v", localErr)
-		}
-	})
+			if localErr := cj.uc.CronSendTransactions(ctx); localErr != nil {
+				log.Error().Msgf("failed cj.uc.CronSendTransactions, err: %v", localErr)
+			}
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("failed adding cron job cj.uc.CronSendTransactions: %w", err)
 	}

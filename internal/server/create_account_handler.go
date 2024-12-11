@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+
 	"github.com/patyukin/mbs-pkg/pkg/errs"
 	paymentpb "github.com/patyukin/mbs-pkg/pkg/proto/payment_v1"
 )

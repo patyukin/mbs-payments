@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/patyukin/bs-payments/internal/model"
 	pkgModel "github.com/patyukin/mbs-pkg/pkg/model"
 	"github.com/rs/zerolog/log"
-	"time"
 )
 
 func (r *Repository) InsertTransaction(ctx context.Context, in model.Payment, accountID, typeTransaction string) (string, error) {

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+
 	"github.com/patyukin/bs-payments/internal/db"
 	authpb "github.com/patyukin/mbs-pkg/pkg/proto/auth_v1"
 	amqp "github.com/rabbitmq/amqp091-go"
