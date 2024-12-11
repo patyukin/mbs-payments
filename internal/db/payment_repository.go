@@ -3,10 +3,11 @@ package db
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/patyukin/bs-payments/internal/model"
 	paymentpb "github.com/patyukin/mbs-pkg/pkg/proto/payment_v1"
 	"github.com/rs/zerolog/log"
-	"time"
 )
 
 func (r *Repository) InsertPayment(ctx context.Context, in *paymentpb.CreatePaymentRequest) (string, error) {

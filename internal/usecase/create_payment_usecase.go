@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/patyukin/bs-payments/internal/db"
 	"github.com/patyukin/mbs-pkg/pkg/model"
@@ -12,53 +13,55 @@ import (
 )
 
 func (u *UseCase) CreatePaymentUseCase(ctx context.Context, in *paymentpb.CreatePaymentRequest) (*paymentpb.CreatePaymentResponse, error) {
-	err := u.registry.ReadCommitted(ctx, func(ctx context.Context, repo *db.Repository) error {
-		balance, err := repo.ExistsPositiveAccountBalance(ctx, in.SenderAccountId)
-		if err != nil {
-			return fmt.Errorf("failed repo.InsertPayment: %w", err)
-		}
+	err := u.registry.ReadCommitted(
+		ctx, func(ctx context.Context, repo *db.Repository) error {
+			balance, err := repo.ExistsPositiveAccountBalance(ctx, in.SenderAccountId)
+			if err != nil {
+				return fmt.Errorf("failed repo.InsertPayment: %w", err)
+			}
 
-		if balance < in.Amount {
-			return fmt.Errorf("not enough balance")
-		}
+			if balance < in.Amount {
+				return fmt.Errorf("not enough balance")
+			}
 
-		paymentID, err := repo.InsertPayment(ctx, in)
-		if err != nil {
-			return fmt.Errorf("failed repo.InsertPayment: %w", err)
-		}
+			paymentID, err := repo.InsertPayment(ctx, in)
+			if err != nil {
+				return fmt.Errorf("failed repo.InsertPayment: %w", err)
+			}
 
-		userInfo, err := u.authClient.GetBriefUserByID(ctx, &authpb.GetBriefUserByIDRequest{UserId: in.UserId})
-		if err != nil {
-			return fmt.Errorf("failed u.authClient.GetUserInfo: %w", err)
-		}
+			userInfo, err := u.authClient.GetBriefUserByID(ctx, &authpb.GetBriefUserByIDRequest{UserId: in.UserId})
+			if err != nil {
+				return fmt.Errorf("failed u.authClient.GetUserInfo: %w", err)
+			}
 
-		code, err := uuid.NewUUID()
-		if err != nil {
-			return fmt.Errorf("failed to generate UUID: %w", err)
-		}
+			code, err := uuid.NewUUID()
+			if err != nil {
+				return fmt.Errorf("failed to generate UUID: %w", err)
+			}
 
-		err = u.chr.SetPaymentConfirmationCode(ctx, in.UserId, paymentID, code.String())
-		if err != nil {
-			return fmt.Errorf("failed u.chr.SetPaymentConfirmationCode: %w", err)
-		}
+			err = u.chr.SetPaymentConfirmationCode(ctx, in.UserId, paymentID, code.String())
+			if err != nil {
+				return fmt.Errorf("failed u.chr.SetPaymentConfirmationCode: %w", err)
+			}
 
-		msg := model.SimpleTelegramMessage{
-			Message: fmt.Sprintf("подтвердите платеж с кодом в течение 1 минуты: %s", code.String()),
-			ChatID:  userInfo.ChatId,
-		}
+			msg := model.SimpleTelegramMessage{
+				Message: fmt.Sprintf("подтвердите платеж с кодом в течение 1 минуты: %s", code.String()),
+				ChatID:  userInfo.ChatId,
+			}
 
-		msgBytes, err := json.Marshal(msg)
-		if err != nil {
-			return fmt.Errorf("failed to marshal message: %w", err)
-		}
+			msgBytes, err := json.Marshal(msg)
+			if err != nil {
+				return fmt.Errorf("failed to marshal message: %w", err)
+			}
 
-		err = u.rbtmq.EnqueueTelegramMessage(ctx, msgBytes, nil)
-		if err != nil {
-			return fmt.Errorf("failed u.rbtmq.PublishPaymentExecutionInitiate: %w", err)
-		}
+			err = u.rbtmq.EnqueueTelegramMessage(ctx, msgBytes, nil)
+			if err != nil {
+				return fmt.Errorf("failed u.rbtmq.PublishPaymentExecutionInitiate: %w", err)
+			}
 
-		return nil
-	})
+			return nil
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed u.registry.ReadCommitted: %w", err)
 	}

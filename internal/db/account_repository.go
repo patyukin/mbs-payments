@@ -3,8 +3,9 @@ package db
 import (
 	"context"
 	"fmt"
-	paymentpb "github.com/patyukin/mbs-pkg/pkg/proto/payment_v1"
 	"time"
+
+	paymentpb "github.com/patyukin/mbs-pkg/pkg/proto/payment_v1"
 )
 
 func (r *Repository) InsertAccount(ctx context.Context, in *paymentpb.CreateAccountRequest) (string, error) {
